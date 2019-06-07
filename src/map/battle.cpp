@@ -645,7 +645,7 @@ int battle_calc_cardfix(int attack_type, struct block_list *src, struct block_li
 			if( sd && !(nk&NK_NO_CARDFIX_ATK) ) {
 				cardfix = cardfix * (100 + sd->magic_addrace[tstatus->race] + sd->magic_addrace[RC_ALL] + sd->magic_addrace2[t_race2]) / 100;
 				if( !(nk&NK_NO_ELEFIX) ) { // Affected by Element modifier bonuses
-					cardfix = cardfix * (100 + sd->magic_addele[tstatus->def_ele] + sd->magic_addele[ELE_ALL] + 
+					cardfix = cardfix * (100 + sd->magic_addele[tstatus->def_ele] + sd->magic_addele[ELE_ALL] +
 						sd->magic_addele_script[tstatus->def_ele] + sd->magic_addele_script[ELE_ALL]) / 100;
 					cardfix = cardfix * (100 + sd->magic_atk_ele[rh_ele] + sd->magic_atk_ele[ELE_ALL]) / 100;
 				}
@@ -1143,7 +1143,7 @@ int64 battle_calc_damage(struct block_list *src,struct block_list *bl,struct Dam
 
 		if( sc->data[SC_WEAPONBLOCKING] && flag&(BF_SHORT|BF_WEAPON) && rnd()%100 < sc->data[SC_WEAPONBLOCKING]->val2 ) {
 			clif_skill_nodamage(bl,src,GC_WEAPONBLOCKING,sc->data[SC_WEAPONBLOCKING]->val1,1);
-			sc_start2(src,bl,SC_COMBO,100,GC_WEAPONBLOCKING,src->id,skill_get_time2(GC_WEAPONBLOCKING,sc->data[SC_WEAPONBLOCKING]->val1));
+			sc_start(src, bl, SC_WEAPONBLOCK_ON, 100, 0, skill_get_time2(GC_WEAPONBLOCKING, 1));
 			d->dmg_lv = ATK_BLOCK;
 			return 0;
 		}
@@ -2632,11 +2632,17 @@ static bool is_attack_hitting(struct Damage* wd, struct block_list *src, struct 
 				if(sd && pc_checkskill(sd,AS_SONICACCEL) > 0)
 					hitrate += hitrate * 50 / 100;
 				break;
+
+			case RK_SONICWAVE:
+					hitrate += hitrate * 3 * skill_lv / 100; // !TODO: Confirm the hitrate bonus
+				break;
+
 #ifdef RENEWAL
 			case RG_BACKSTAP:
 				hitrate += skill_lv; // !TODO: What's the rate increase?
 				break;
 #endif
+
 			case MC_CARTREVOLUTION:
 			case GN_CART_TORNADO:
 			case GN_CARTCANNON:
@@ -2650,7 +2656,10 @@ static bool is_attack_hitting(struct Damage* wd, struct block_list *src, struct 
 				hitrate += 10 + 4 * skill_lv;
 				break;
 			case SC_FATALMENACE:
-				hitrate -= 35 - 5 * skill_lv;
+				if (skill_lv < 6)
+					hitrate -= 35 - 5 * skill_lv;
+				else if (skill_lv > 6)
+					hitrate += 5 * skill_lv - 30;
 				break;
 			case RL_SLUGSHOT:
 				{
@@ -3391,8 +3400,11 @@ static void battle_calc_multi_attack(struct Damage* wd, struct block_list *src,s
 
 	switch (skill_id) {
 		case RA_AIMEDBOLT:
-			if( tsc && (tsc->data[SC_BITE] || tsc->data[SC_ANKLE] || tsc->data[SC_ELECTRICSHOCKER]) )
-				wd->div_ = tstatus->size + 2 + ( (rnd()%100 < 50-tstatus->size*10) ? 1 : 0 );
+			wd->div_ = 2 + tstatus->size + rnd()%2;
+			break;
+		case SC_FATALMENACE:
+			if (sd && sd->weapontype1 == W_DAGGER)
+				wd->div_++;
 			break;
 		case RL_QD_SHOT:
 			wd->div_ = 1 + (sd ? sd->status.job_level : 1) / 20 + (tsc && tsc->data[SC_C_MARKER] ? 2 : 0);
@@ -3912,7 +3924,7 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 			skillratio += ((skill_lv - 1) % 5 + 1) * 100;
 			break;
 		case RK_SONICWAVE:
-			skillratio += -100 + (skill_lv + 5) * 100; // ATK = {((Skill Level + 5) x 100) x (1 + [(Caster's Base Level - 100) / 200])} %
+			skillratio += -100 + (skill_lv + 7) * 100; // ATK = {((Skill Level + 7) x 100) x (1 + [(Caster's Base Level - 100) / 200])} %
 			skillratio = skillratio * (100 + (status_get_lv(src) - 100) / 2) / 100;
 			break;
 		case RK_HUNDREDSPEAR:
@@ -3958,8 +3970,8 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 			RE_LVL_DMOD(120);
 			break;
 		case GC_COUNTERSLASH:
-			//ATK [{(Skill Level x 100) + 300} x Caster's Base Level / 120]% + ATK [(AGI x 2) + (Caster's Job Level x 4)]%
-			skillratio += 200 + (100 * skill_lv);
+			//ATK [{(Skill Level x 150) + 300} x Caster's Base Level / 120]% + ATK [(AGI x 2) + (Caster's Job Level x 4)]%
+			skillratio += -100 + 300 + 150 * skill_lv;
 			RE_LVL_DMOD(120);
 			break;
 		case GC_VENOMPRESSURE:
@@ -3990,7 +4002,7 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 			RE_LVL_DMOD(100);
 			break;
 		case RA_AIMEDBOLT:
-			skillratio += 400 + 50 * skill_lv;
+			skillratio += 100 + 20 * skill_lv + 500;
 			RE_LVL_DMOD(100);
 			break;
 		case RA_CLUSTERBOMB:
@@ -4080,7 +4092,7 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 			RE_LVL_DMOD(100);
 			break;
 		case LG_SHIELDPRESS:
-			skillratio += -100 + 150 * skill_lv + status_get_str(src);
+			skillratio += -100 + 200 * skill_lv + sstatus->str;
 			if (sd) {
 				short index = sd->equip_index[EQI_HAND_L];
 
@@ -4125,10 +4137,6 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 		case LG_OVERBRAND_PLUSATK: // Only Piercing and Swing damage get RE_LVL_DMOD bonus damage
 			skillratio += -100 + 200 * skill_lv + rnd()%90 + 10;
 			break;
-		case LG_RAYOFGENESIS:
-			skillratio += 200 + 300 * skill_lv;
-			RE_LVL_DMOD(100);
-			break;
 		case LG_EARTHDRIVE:
 			if (sd) {
 				short index = sd->equip_index[EQI_HAND_L];
@@ -4168,8 +4176,8 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 			RE_LVL_DMOD(100);
 			break;
 		case SR_FALLENEMPIRE:
-			// ATK [(Skill Level x 150 + 100) x Caster Base Level / 150] %
-			skillratio += 150 * skill_lv;
+			// ATK [(Skill Level x 250 + 100) x Caster Base Level / 150] %
+			skillratio += -100 + 250 * skill_lv + 100;
 			RE_LVL_DMOD(150);
  			break;
 		case SR_TIGERCANNON:
@@ -4212,7 +4220,7 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 					skillratio += 100 * tsd->weight / tsd->max_weight;
 				RE_LVL_DMOD(150);
 			} else { // ATK [(Skill Level x 100 + 500) x Caster Base Level / 100] %
-				skillratio += 400 + 100 * skill_lv;
+				skillratio += -100 + 100 * skill_lv + 500;
 				RE_LVL_DMOD(100);
 			}
 			break;
@@ -4249,6 +4257,8 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 		case WM_SEVERE_RAINSTORM_MELEE:
 			//ATK [{(Caster DEX + AGI) x (Skill Level / 5)} x Caster Base Level / 100] %
 			skillratio = (status_get_dex(src) + status_get_agi(src)) * skill_lv / 5;
+			if (wd->miscflag&4) // Whip/Instrument equipped
+				skillratio += 100; // !TODO: What's the weapon bonus?
 			RE_LVL_DMOD(100);
 			break;
 		case WM_GREAT_ECHO:
@@ -4262,8 +4272,8 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 			}
 			RE_LVL_DMOD(100);
 			break;
-		case GN_CART_TORNADO: { // ATK [( Skill Level x 50 ) + ( Cart Weight / ( 150 - Caster Base STR ))] + ( Cart Remodeling Skill Level x 50 )] %
-				skillratio += -100 + 50 * skill_lv;
+		case GN_CART_TORNADO: { // ATK [( Skill Level x 100 ) + ( Cart Weight / ( 150 - Caster Base STR ))] + ( Cart Remodeling Skill Level x 50 )] %
+				skillratio += -100 + 100 * skill_lv;
 				if(sd && sd->cart_weight)
 					skillratio += sd->cart_weight / 10 / (150 - min(sd->status.str,120)) + pc_checkskill(sd,GN_REMODELING_CART) * 50;
 			}
@@ -4273,7 +4283,7 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 			skillratio += -100 + 60 * skill_lv + ((sd) ? pc_checkskill(sd, GN_REMODELING_CART) : 1) * 50 * status_get_int(src) / 40;
 			break;
 		case GN_SPORE_EXPLOSION:
-			skillratio += 100 + status_get_int(src) + 100 * skill_lv;
+			skillratio += -100 + 150 * skill_lv + 200 + status_get_int(src);
 			RE_LVL_DMOD(100);
 			break;
 		case GN_WALLOFTHORN:
@@ -4310,12 +4320,6 @@ static int battle_calc_attack_skill_ratio(struct Damage* wd, struct block_list *
 				}
 				RE_LVL_DMOD(100);
 			}
-			break;
-		case SO_VARETYR_SPEAR://ATK [{( Striking Level x 50 ) + ( Varetyr Spear Skill Level x 50 )} x Caster Base Level / 100 ] %
-			skillratio += -100 + 50 * skill_lv + ((sd) ? pc_checkskill(sd, SO_STRIKING) * 50 : 0);
-			RE_LVL_DMOD(100);
-			if (sc && sc->data[SC_BLAST_OPTION])
-				skillratio += (sd ? sd->status.job_level * 5 : 0);
 			break;
 		// Physical Elemantal Spirits Attack Skills
 		case EL_CIRCLE_OF_FIRE:
@@ -5239,22 +5243,14 @@ static void battle_calc_weapon_final_atk_modifiers(struct Damage* wd, struct blo
 		if (skill_id != SN_SHARPSHOOTING && skill_id != RA_ARROWSTORM)
 			status_change_end(src, SC_CAMOUFLAGE, INVALID_TIMER);
 	}
-	switch (skill_id) {
-		case LG_RAYOFGENESIS:
-			{
-				struct Damage md = battle_calc_magic_attack(src, target, skill_id, skill_lv, wd->miscflag);
-				wd->damage += md.damage;
-			}
-			break;
+
 #ifndef RENEWAL
-		case ASC_BREAKER:
-			{	//Breaker's int-based damage (a misc attack?)
-				struct Damage md = battle_calc_misc_attack(src, target, skill_id, skill_lv, wd->miscflag);
-				wd->damage += md.damage;
-			}
-			break;
-#endif
+	if (skill_id == ASC_BREAKER) { //Breaker's int-based damage (a misc attack?)
+		struct Damage md = battle_calc_misc_attack(src, target, skill_id, skill_lv, wd->miscflag);
+
+		wd->damage += md.damage;
 	}
+#endif
 
 	// Skill damage adjustment
 	if ((skill_damage = battle_skill_damage(src, target, skill_id)) != 0)
@@ -5645,9 +5641,8 @@ static struct Damage battle_calc_weapon_attack(struct block_list *src, struct bl
 			case ASC_BREAKER:
 			case CR_ACIDDEMONSTRATION:
 			case GN_FIRE_EXPANSION_ACID:
-#endif
-			case SO_VARETYR_SPEAR:
 				break; //These skills will do a card fix later
+#endif
 			default:
 				wd.damage += battle_calc_cardfix(BF_WEAPON, src, target, battle_skill_get_damage_properties(skill_id, wd.miscflag), right_element, left_element, wd.damage, 0, wd.flag);
 				if(is_attack_left_handed(src, skill_id))
@@ -5727,9 +5722,8 @@ static struct Damage battle_calc_weapon_attack(struct block_list *src, struct bl
 		case ASC_BREAKER:
 		case CR_ACIDDEMONSTRATION:
 		case GN_FIRE_EXPANSION_ACID:
-#endif
-		case SO_VARETYR_SPEAR:
 			return wd; //These skills will do a GVG fix later
+#endif
 		default:
 			battle_calc_attack_gvg_bg(&wd, src, target, skill_id, skill_lv);
 			break;
@@ -6105,9 +6099,7 @@ struct Damage battle_calc_magic_attack(struct block_list *src,struct block_list 
 						break;
 #endif
 					case AB_JUDEX:
-						skillratio += 200 + 20 * skill_lv;
-						if (skill_lv == 5)
-							skillratio += 170;
+						skillratio += -100 + 300 + 40 * skill_lv;
 						RE_LVL_DMOD(100);
 						break;
 					case AB_ADORAMUS:
@@ -6194,7 +6186,10 @@ struct Damage battle_calc_magic_attack(struct block_list *src,struct block_list 
 					case WL_TETRAVORTEX_WATER:
 					case WL_TETRAVORTEX_WIND:
 					case WL_TETRAVORTEX_GROUND:
-						skillratio += 400 + 500 * skill_lv;
+						if (skill_lv < 6)
+							skillratio += -100 + 500 + 500 * skill_lv;
+						else
+							skillratio += -100 + 3000 + 200 * (skill_lv - 5);
 						break;
 					case WL_SUMMON_ATK_FIRE:
 					case WL_SUMMON_ATK_WATER:
@@ -6204,13 +6199,10 @@ struct Damage battle_calc_magic_attack(struct block_list *src,struct block_list 
 						RE_LVL_DMOD(100);
 						break;
 					case LG_RAYOFGENESIS:
-						if(sc) {
-							if(sc->data[SC_INSPIRATION])
-								skillratio += 1400;
-							if(sc->data[SC_BANDING])
-								skillratio += -100 + 300 * skill_lv + 200 * sc->data[SC_BANDING]->val2;
-							skillratio = skillratio * ((sd) ? sd->status.job_level / 25 : 1);
-						}
+						skillratio += -100 + 200 * skill_lv;
+						if(sc && sc->data[SC_INSPIRATION])
+							skillratio += 1400;
+						RE_LVL_DMOD(100);
 						break;
 					case LG_SHIELDSPELL: // [(Casters Base Level x 4) + (Shield MDEF x 100) + (Casters INT x 2)] %
 						if (sd && skill_lv == 2)
@@ -6486,12 +6478,6 @@ struct Damage battle_calc_magic_attack(struct block_list *src,struct block_list 
 #endif
 				}
 				break;
-			case SO_VARETYR_SPEAR: {
-					struct Damage wd = battle_calc_weapon_attack(src, target, skill_id, skill_lv, mflag);
-
-					ad.damage += wd.damage;
-				}
-				break;
 		}
 
 #ifndef RENEWAL
@@ -6712,7 +6698,7 @@ struct Damage battle_calc_misc_attack(struct block_list *src,struct block_list *
 				struct Damage atk = battle_calc_weapon_attack(src, target, skill_id, skill_lv, 0);
 				struct Damage matk = battle_calc_magic_attack(src, target, skill_id, skill_lv, 0);
 				md.damage = 7 * ((atk.damage/skill_lv + matk.damage/skill_lv) * tstatus->vit / 100 );
-	
+
 				// AD benefits from endow/element but damage is forced back to neutral
 				md.damage = battle_attr_fix(src, target, md.damage, ELE_NEUTRAL, tstatus->def_ele, tstatus->ele_lv);
 			}

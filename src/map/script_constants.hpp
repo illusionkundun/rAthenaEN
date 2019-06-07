@@ -1522,8 +1522,12 @@
 	export_constant(SC_LHZ_DUN_N3);
 	export_constant(SC_LHZ_DUN_N4);
 	export_constant(SC_ANCILLA);
+
 	export_constant(SC_ADAPTATION);
 	export_constant(SC_BASILICA_CELL);
+
+	export_constant(SC_WEAPONBLOCK_ON);
+
 #ifdef RENEWAL
 	export_constant(SC_EXTREMITYFIST2);
 #endif
@@ -4219,7 +4223,7 @@
 	export_constant(ADOPT_MORE_CHILDREN);
 	export_constant(ADOPT_LEVEL_70);
 	export_constant(ADOPT_MARRIED);
-	
+
 	/* directions */
 	export_constant(DIR_NORTH);
 	export_constant(DIR_NORTHWEST);
@@ -4277,13 +4281,13 @@
 	export_constant(STOR_MODE_NONE);
 	export_constant(STOR_MODE_GET);
 	export_constant(STOR_MODE_PUT);
-	
+
 	/* instance enter */
 	export_constant(IE_OK);
 	export_constant(IE_NOMEMBER);
 	export_constant(IE_NOINSTANCE);
 	export_constant(IE_OTHER);
-	
+
 	/* months */
 	export_constant(JANUARY);
 	export_constant(FEBRUARY);
@@ -4297,7 +4301,7 @@
 	export_constant(OCTOBER);
 	export_constant(NOVEMBER);
 	export_constant(DECEMBER);
-	
+
 	/* days of the week */
 	export_constant(SUNDAY);
 	export_constant(MONDAY);
@@ -4306,7 +4310,7 @@
 	export_constant(THURSDAY);
 	export_constant(FRIDAY);
 	export_constant(SATURDAY);
-	
+
 	/* date types */
 	export_constant(DT_SECOND);
 	export_constant(DT_MINUTE);

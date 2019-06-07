@@ -878,8 +878,12 @@ enum sc_type : int16 {
 	SC_LHZ_DUN_N4,
 
 	SC_ANCILLA,
+
 	SC_ADAPTATION,
 	SC_BASILICA_CELL, // Used in renewal mode for cell_basilica only
+
+	SC_WEAPONBLOCK_ON,
+
 
 #ifdef RENEWAL
 	SC_EXTREMITYFIST2, //! NOTE: This SC should be right before SC_MAX, so it doesn't disturb if RENEWAL is disabled
